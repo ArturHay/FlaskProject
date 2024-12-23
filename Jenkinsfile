@@ -4,7 +4,6 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                // Cloner le code depuis GitHub via SSH
                 checkout([$class: 'GitSCM',
                           branches: [[name: '*/main']],
                           userRemoteConfigs: [[
@@ -34,7 +33,6 @@ pipeline {
         stage('Transfer to VPS') {
             steps {
                 script {
-                    // Utiliser la clé SSH pour transférer le fichier
                     withCredentials([sshUserPrivateKey(
                         credentialsId: '639d8da5-12d0-439f-ae69-b5f7e615ee0c',
                         keyFileVariable: 'SSH_KEY',
@@ -53,28 +51,28 @@ pipeline {
         stage('Deploy on VPS') {
             steps {
                 script {
-                    // Utiliser la clé SSH pour déployer sur le VPS
                     withCredentials([sshUserPrivateKey(
                         credentialsId: '639d8da5-12d0-439f-ae69-b5f7e615ee0c',
                         keyFileVariable: 'SSH_KEY',
                         usernameVariable: 'SSH_USER'
                     )]) {
-                        sh """
-                          ssh -o StrictHostKeyChecking=no -i \$SSH_KEY \$SSH_USER@185.158.132.195 << 'EOSSH'
-                            # Charger l'image Docker
+                        // Écrire un script temporaire à exécuter sur le VPS
+                        writeFile file: 'deploy.sh', text: '''
+                            #!/bin/bash
                             docker load -i /root/flaskapp.tar
-                            
-                            # Vérifier si le conteneur existe déjà
-                            if [ \$(docker ps -a -q -f name=flask_app_container) ]; then
+                            if [ $(docker ps -a -q -f name=flask_app_container) ]; then
                                 echo "Stopping and removing existing container..."
                                 docker stop flask_app_container || true
                                 docker rm flask_app_container || true
                             fi
-                            
-                            # Lancer un nouveau conteneur
                             echo "Starting new container..."
                             docker run -d --name flask_app_container -p 8877:8877 flask-app:latest
-                          EOSSH
+                        '''
+
+                        // Transférer et exécuter le script sur le VPS
+                        sh """
+                          scp -o StrictHostKeyChecking=no -i \$SSH_KEY deploy.sh \$SSH_USER@185.158.132.195:/root/
+                          ssh -o StrictHostKeyChecking=no -i \$SSH_KEY \$SSH_USER@185.158.132.195 'bash /root/deploy.sh && rm /root/deploy.sh'
                         """
                     }
                 }
