@@ -74,9 +74,6 @@ pipeline {
                             # Lancer un nouveau conteneur
                             echo "Starting new container..."
                             docker run -d --name flask_app_container -p 8877:8877 flask-app:latest
-                            
-                            # Supprimer le fichier transféré
-                            rm /root/flaskapp.tar
                           EOSSH
                         """
                     }
@@ -86,10 +83,6 @@ pipeline {
     }
 
     post {
-        always {
-            // Nettoyage après chaque exécution
-            sh 'rm -f flaskapp.tar || true'
-        }
         success {
             echo 'Deployment succeeded!'
         }
