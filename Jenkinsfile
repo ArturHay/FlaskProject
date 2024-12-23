@@ -61,10 +61,21 @@ pipeline {
                     )]) {
                         sh """
                           ssh -o StrictHostKeyChecking=no -i \$SSH_KEY \$SSH_USER@185.158.132.195 << 'EOSSH'
+                            # Charger l'image Docker
                             docker load -i /root/flaskapp.tar
-                            docker stop flask_app_container || true
-                            docker rm flask_app_container || true
+
+                            # Vérifier si le conteneur existe déjà
+                            if [ \$(docker ps -a -q -f name=flask_app_container) ]; then
+                                echo "Stopping and removing existing container..."
+                                docker stop flask_app_container || true
+                                docker rm flask_app_container || true
+                            fi
+
+                            # Lancer un nouveau conteneur
+                            echo "Starting new container..."
                             docker run -d --name flask_app_container -p 8877:8877 flask-app:latest
+
+                            # Supprimer le fichier transféré
                             rm /root/flaskapp.tar
                           EOSSH
                         """
