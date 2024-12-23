@@ -2,7 +2,19 @@ pipeline {
     agent any
 
     stages {
-        // plus besoin du stage('Checkout'), Jenkins a déjà fait un checkout avant
+        stage('Checkout') {
+            steps {
+                // Cloner le code depuis GitHub via SSH
+                checkout([$class: 'GitSCM',
+                          branches: [[name: '*/main']],
+                          userRemoteConfigs: [[
+                              url: 'git@github.com:ArturHay/FlaskProject.git',
+                              credentialsId: 'c3fcdb41-ad56-416f-83f3-14eb22677f8d'
+                          ]]
+                ])
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 script {
@@ -22,9 +34,12 @@ pipeline {
         stage('Transfer to VPS') {
             steps {
                 script {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'vps-ssh-cred',
-                                                       keyFileVariable: 'SSH_KEY',
-                                                       usernameVariable: 'SSH_USER')]) {
+                    // On utilise la *même* clé pour SSH vers le VPS
+                    withCredentials([sshUserPrivateKey(
+                        credentialsId: 'c3fcdb41-ad56-416f-83f3-14eb22677f8d',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )]) {
                         sh """
                           scp -o StrictHostKeyChecking=no -i \$SSH_KEY \
                               flaskapp.tar \
@@ -38,9 +53,11 @@ pipeline {
         stage('Deploy on VPS') {
             steps {
                 script {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'vps-ssh-cred',
-                                                       keyFileVariable: 'SSH_KEY',
-                                                       usernameVariable: 'SSH_USER')]) {
+                    withCredentials([sshUserPrivateKey(
+                        credentialsId: 'c3fcdb41-ad56-416f-83f3-14eb22677f8d',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )]) {
                         sh """
                           ssh -o StrictHostKeyChecking=no -i \$SSH_KEY \
                               \$SSH_USER@185.158.132.195 << 'EOSSH'
@@ -59,7 +76,6 @@ pipeline {
 
     post {
         always {
-            // Nettoyage local
             sh 'rm -f flaskapp.tar || true'
         }
         success {
