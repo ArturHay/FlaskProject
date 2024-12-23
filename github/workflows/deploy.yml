@@ -1,0 +1,64 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ "main" ]  # Déclenche le déploiement sur push (ou merge) dans la branche main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Récupérer le code du dépôt
+      - name: Check out the code
+        uses: actions/checkout@v3
+
+      # 2) Configurer l'accès SSH
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # 3) Construire l'image Docker en local (optionnel, juste pour valider)
+      - name: Build Docker image
+        run: |
+          docker build -t flask-app:latest .
+
+      # 4) Déployer sur le VPS via SSH
+      - name: Deploy to VPS
+        run: |
+          # On se connecte via SSH et on exécute des commandes sur le VPS
+          ssh -o StrictHostKeyChecking=no root@185.158.132.195 << 'EOSSH'
+            # Arrêter et supprimer l'ancien conteneur (s'il existe déjà)
+            docker stop flask_app_container || true
+            docker rm flask_app_container || true
+
+            # Aller dans /root ou un répertoire temporaire pour construire/puller (plusieurs méthodes possibles)
+            # Méthode A: Build directement sur le serveur (plus simple si code en local).
+            #   - Nécessite que le code soit sur le serveur, ou qu'on le clone depuis Git ou qu'on le transfère.
+            #   - Ici on va pull depuis Git ou on a besoin d'une façon d'envoyer le code sur le VPS.
+            #
+            # Méthode B: Pousser l'image sur un registry (DockerHub, GHCR, etc.) puis la pull sur le serveur.
+            #   - Pour un usage local et rapide, on va tout faire sur le VPS en mode "git clone" (exemple).
+            
+            # Installer git s'il n'est pas installé (si besoin)
+            apt-get update && apt-get install -y git
+
+            # Cloner ou mettre à jour le projet (si besoin)
+            # On peut créer un dossier /root/monapp
+            if [ ! -d "/root/monapp" ]; then
+              git clone --depth=1 https://github.com/<VOTRE-USERNAME>/<VOTRE-REPO>.git /root/monapp
+            else
+              cd /root/monapp
+              git pull
+            fi
+
+            # Aller dans /root/monapp
+            cd /root/monapp
+
+            # Build l'image Docker
+            docker build -t flask-app:latest .
+
+            # Lancer le conteneur en détaché sur le port 8877
+            docker run -d --name flask_app_container -p 8877:8877 flask-app:latest
+          EOSSH
