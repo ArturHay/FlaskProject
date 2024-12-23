@@ -9,7 +9,7 @@ pipeline {
                           branches: [[name: '*/main']],
                           userRemoteConfigs: [[
                               url: 'git@github.com:ArturHay/FlaskProject.git',
-                              credentialsId: 'c3fcdb41-ad56-416f-83f3-14eb22677f8d'
+                              credentialsId: '639d8da5-12d0-439f-ae69-b5f7e615ee0c'
                           ]]
                 ])
             }
