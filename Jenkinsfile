@@ -2,23 +2,10 @@ pipeline {
     agent any
 
     stages {
-        stage('Checkout') {
-            steps {
-                // Cloner le code source depuis GitHub
-                checkout([$class: 'GitSCM',
-                          branches: [[name: '*/main']],
-                          userRemoteConfigs: [[
-                              url: 'git@github.com:ArturHay/FlaskProject.git',
-                              credentialsId: 'jenkins'
-                          ]]
-                ])
-            }
-        }
-
+        // plus besoin du stage('Checkout'), Jenkins a déjà fait un checkout avant
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Construire l'image Docker (tag = flask-app:latest)
                     sh 'docker build -t flask-app:latest .'
                 }
             }
@@ -27,7 +14,6 @@ pipeline {
         stage('Save Docker Image') {
             steps {
                 script {
-                    // Exporter l'image dans un fichier tar (flaskapp.tar)
                     sh 'docker save flask-app:latest -o flaskapp.tar'
                 }
             }
@@ -36,8 +22,6 @@ pipeline {
         stage('Transfer to VPS') {
             steps {
                 script {
-                    // Transférer flaskapp.tar sur le VPS via scp
-                    // On récupère la clé SSH du VPS via un Credential Jenkins (vps-ssh-cred)
                     withCredentials([sshUserPrivateKey(credentialsId: 'vps-ssh-cred',
                                                        keyFileVariable: 'SSH_KEY',
                                                        usernameVariable: 'SSH_USER')]) {
@@ -54,7 +38,6 @@ pipeline {
         stage('Deploy on VPS') {
             steps {
                 script {
-                    // Se connecter au VPS, charger l'image et lancer le conteneur
                     withCredentials([sshUserPrivateKey(credentialsId: 'vps-ssh-cred',
                                                        keyFileVariable: 'SSH_KEY',
                                                        usernameVariable: 'SSH_USER')]) {
@@ -76,7 +59,7 @@ pipeline {
 
     post {
         always {
-            // Nettoyage : supprimer le fichier tar local (runner Jenkins)
+            // Nettoyage local
             sh 'rm -f flaskapp.tar || true'
         }
         success {
