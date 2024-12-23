@@ -34,7 +34,7 @@ pipeline {
         stage('Transfer to VPS') {
             steps {
                 script {
-                    // On utilise la *même* clé pour SSH vers le VPS
+                    // Utiliser la clé SSH pour transférer le fichier
                     withCredentials([sshUserPrivateKey(
                         credentialsId: '639d8da5-12d0-439f-ae69-b5f7e615ee0c',
                         keyFileVariable: 'SSH_KEY',
@@ -51,30 +51,32 @@ pipeline {
         }
 
         stage('Deploy on VPS') {
-    steps {
-        script {
-            withCredentials([sshUserPrivateKey(
-                credentialsId: 'c3fcdb41-ad56-416f-83f3-14eb22677f8d',
-                keyFileVariable: 'SSH_KEY',
-                usernameVariable: 'SSH_USER'
-            )]) {
-                sh """
-                  ssh -o StrictHostKeyChecking=no -i \$SSH_KEY \$SSH_USER@185.158.132.195 << 'EOSSH'
-                    docker load -i /root/flaskapp.tar
-                    docker stop flask_app_container || true
-                    docker rm flask_app_container || true
-                    docker run -d --name flask_app_container -p 8877:8877 flask-app:latest
-                    rm /root/flaskapp.tar
-                  EOSSH
-                """
+            steps {
+                script {
+                    // Utiliser la clé SSH pour déployer sur le VPS
+                    withCredentials([sshUserPrivateKey(
+                        credentialsId: 'c3fcdb41-ad56-416f-83f3-14eb22677f8d',
+                        keyFileVariable: 'SSH_KEY',
+                        usernameVariable: 'SSH_USER'
+                    )]) {
+                        sh """
+                          ssh -o StrictHostKeyChecking=no -i \$SSH_KEY \$SSH_USER@185.158.132.195 << 'EOSSH'
+                            docker load -i /root/flaskapp.tar
+                            docker stop flask_app_container || true
+                            docker rm flask_app_container || true
+                            docker run -d --name flask_app_container -p 8877:8877 flask-app:latest
+                            rm /root/flaskapp.tar
+                          EOSSH
+                        """
+                    }
+                }
             }
         }
     }
-}
-
 
     post {
         always {
+            // Nettoyage après chaque exécution
             sh 'rm -f flaskapp.tar || true'
         }
         success {
